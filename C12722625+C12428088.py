@@ -2,16 +2,22 @@
 Authors:
   Rory Higgins: C12428088
   Shane Farrell: C12722625
+
+Artificial Intelligence 2 - Assignment 2
+
+"Develop a classifier that uses data to
+predict the outcome of a Bank marketing campaign."
+
 """
-from pprint import pprint
-from math import log2
 from random import seed, shuffle
-import numpy as np
 import pandas as pd
-from sklearn.tree import DecisionTreeClassifier, export_graphviz
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction import DictVectorizer
 
+# Splits dataset, performing validation and computing an accuracy score
+compute_accuracy = False
+
+# Descriptive feature names
 names = [
     "id",
     "age",
@@ -34,11 +40,16 @@ names = [
 ]
 
 
+def split(data, frac=1/2):
+    pivot = int(len(data) * frac)
+    return data[:pivot], data[pivot:]
+
+
 def to_list(dataframe):
     """
     Converts dataframe to a list of dictionaries, and adds the "id" column
 
-    Unfortunately rather expensive, but necessary for DictVectorizer.
+    Unfortunately rather expensive, but necessary for DictVectorizer
     DataFrame.to_dict is not used as it does not preserve order
     """
     rows = []
@@ -50,57 +61,63 @@ def to_list(dataframe):
     return rows
 
 
-def drop_column(rows, name):
-    for row in rows:
-        del row[name]
-
-
-def get_column(rows, name):
-    return [row[name] for row in rows]
-
-
-def proces_columns(rows):
-    drop_column(rows, "id")
-    drop_column(rows, "feature")
-    drop_column(rows, "duration")
-
-
-def split(data):
-    midway = len(data) // 2
-    return data[:midway], data[midway:]
-
-
 def load_data(fname, names):
     data = pd.read_csv(fname, index_col=0, names=names)
     return to_list(data)
 
 
+def process_columns(rows):
+    """
+    Cleans the data to account for issues that could skew the results
+    """
+    for row in rows:
+        # definitely doesn't belong in training data
+        del row["id"]
+        del row["feature"]
+
+        # introducing a meaningful correlation from otherwise junk data
+        row["contacted"] = (row["pdays"] == -1)
+
+        # "-1" values would likely skew the results
+        del row["pdays"]
+
+        # all zero
+        del row["duration"]
+
+        # not really numeric (does not make sense to take )
+        del row["day"]
+
+
 def main():
     onehot_encoder = DictVectorizer(sparse=False)
     classifier = RandomForestClassifier(
+        random_state=123,
+        n_estimators=100,
         criterion="entropy"
     )
 
     training_rows = load_data("data/trainingset.txt", names)
     query_rows = load_data("data/queries.txt", names)
 
-    seed(123)
-    shuffle(training_rows)
+    if compute_accuracy:
+        seed(123)
+        shuffle(training_rows)
 
-    training_features = get_column(training_rows, "feature")
-    query_ids = get_column(query_rows, "id")
+    training_features = [row["feature"] for row in training_rows]
+    query_ids = [row["id"] for row in training_rows]
 
-    proces_columns(training_rows)
-    proces_columns(query_rows)
+    process_columns(training_rows)
+    process_columns(query_rows)
 
     training_rows = onehot_encoder.fit_transform(training_rows)
     query_rows = onehot_encoder.fit_transform(query_rows)
 
-    training_rows, validation_rows = split(training_rows)
-    training_features, validation_features = split(training_features)
+    if compute_accuracy:
+        # split dataset into training and validation data sets
+        training_rows, validation_rows = split(training_rows)
+        training_features, validation_features = split(training_features)
 
     classifier.fit(training_rows, training_features)
-    accuracy = classifier.score(validation_rows, validation_features)
 
     # make target estimates
     result = classifier.predict(query_rows)
@@ -108,10 +125,12 @@ def main():
     result_data.to_csv("solutions/C12722625+C12428088.txt", header=False,
                        index=False, float_format="%.4f")
 
-    ratio = len([row for row in result if row == "TypeA"]) / len(result)
+    if compute_accuracy:
+        accuracy = classifier.score(validation_rows, validation_features)
+        print("accuracy:", accuracy)
 
-    print("A/B ratio:", ratio)
-    print("accuracy:", accuracy)
+        ratio = len([row for row in result if row == "TypeA"]) / len(result)
+        print("A/B ratio:", ratio)
 
 
 if __name__ == "__main__":
