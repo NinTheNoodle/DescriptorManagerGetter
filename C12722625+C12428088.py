@@ -33,7 +33,7 @@ names = [
 ]
 
 
-def dataframe_to_list(dataframe):
+def to_list(dataframe):
     """
     Converts dataframe to a list of dictionaries, and adds the "id" column
 
@@ -70,7 +70,7 @@ def main(data_fname="data/trainingset.txt",
 
     # extract data
     data = pd.read_csv(data_fname, index_col=0, names=names)
-    rows = dataframe_to_list(data)
+    rows = to_list(data)
     drop_column(rows, "id")
     features = drop_column(rows, "feature")
 
@@ -98,8 +98,9 @@ def main(data_fname="data/trainingset.txt",
 
     # extract queries
     query_data = pd.read_csv(query_fname, index_col=0, names=names)
-    query_ids = list(query_data.index)
-    queries = list(query_data.to_dict(orient="index").values())
+    query_rows = to_list(query_data)
+    query_ids = drop_column(query_rows, "id")
+    drop_column(query_rows, "feature")
 
 if __name__ == "__main__":
     main()
