@@ -3,13 +3,15 @@ Authors:
   Rory Higgins: C12428088
   Shane Farrell: C12722625
 """
+from math import log2
+from pprint import pprint
 import numpy as np
 import pandas as pd
 from sklearn.tree import DecisionTreeClassifier, export_graphviz
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction import DictVectorizer
-from pprint import pprint
 
-headers = [
+names = [
     "id",
     "age",
     "job",
@@ -31,49 +33,39 @@ headers = [
 ]
 
 
+def main(fname="data/trainingset.txt", names=names):
+    # import pdb; pdb.set_trace()
 
+    # extract data
+    data = pd.read_csv(fname, index_col=0, names=names)
+    rows = list(data.to_dict(orient="index").values())
 
-def onehot_encode(dataframe):
-    result = {}
-    
-    for column, data_type in zip(dataframe, dataframe.dtypes):
-        cells = list(dataframe[column])
-        
-        if data_type == np.dtype("O"):
-            for category in set(cells):
-                new_column = "{}={}".format(column, category)
-                result[new_column] = [int(x == category) for x in cells]
-        elif data_type == np.dtype("int64"):
-            result[column] = cells
-        else:
-            raise NotImplemented("Unknown data type")
-
-    return result
-
-def get_training_data(data):
-    rows = data.to_dict(orient="index").values()
+    # extract features
+    features = [row["feature"] for row in rows]
     for row in rows:
         del row["feature"]
 
+    # perform one-hot encoding
     vectorizer = DictVectorizer(sparse=False)
-    training_data = vectorizer.fit_transform(rows)
+    rows = vectorizer.fit_transform(rows)
 
-    return training_data, vectorizer
+    # split into training and validation sets
+    midway = len(rows) // 2
+    training_rows = rows[:midway]
+    training_features = features[:midway]
+    validation_rows = rows[midway:]
+    validation_features = features[midway:]
 
+    classifier = RandomForestClassifier(
+        criterion="entropy",
+        max_depth=int(log2(len(rows))) // 2,
+        n_jobs=8
+    )
+    classifier.fit(training_rows, training_features)
 
-def main():
-    data = pd.read_csv("data/trainingset.txt", index_col=0, names=headers)
+    accuracy = classifier.score(validation_rows, validation_features)
+    print(accuracy)
 
-    training_features = data["feature"]
-    pie = onehot_encode(data)
-    #training_data, vectorizer = get_training_data(data)
-
-    #classifier = DecisionTreeClassifier(max_depth=6, criterion="entropy")
-    #classifier.fit(training_data, training_features)
-    import pdb; pdb.set_trace()
-    #export_graphviz(classifier.tree_,
-    #                out_file='tree_d1.dot',
-    #                feature_names=training_features)
 
 if __name__ == "__main__":
     main()

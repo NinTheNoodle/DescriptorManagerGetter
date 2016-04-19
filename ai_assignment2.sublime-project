@@ -1,0 +1,19 @@
+{
+	"folders":
+	[
+		{
+			"path": ".",
+			"folder_exclude_patterns":
+			[
+				"__pycache__",
+			]
+		},
+		{
+			"path": "C:\\Anaconda3\\Lib\\site-packages\\sklearn",
+			"folder_exclude_patterns":
+			[
+				"__pycache__",
+			]
+		}
+	]
+}
