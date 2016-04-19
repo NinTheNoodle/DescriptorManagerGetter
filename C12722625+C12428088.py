@@ -34,6 +34,12 @@ names = [
 ]
 
 
+def get_column_processes():
+    return {
+        "duration": drop_column
+    }
+
+
 def to_list(dataframe):
     """
     Converts dataframe to a list of dictionaries, and adds the "id" column
@@ -68,6 +74,7 @@ def main(data_fname="data/trainingset.txt",
          query_fname="data/queries.txt",
          names=names):
     # import pdb; pdb.set_trace()
+    process_columns = get_column_processes()
 
     vectorizer = DictVectorizer(sparse=False)
 
@@ -77,6 +84,10 @@ def main(data_fname="data/trainingset.txt",
     shuffle(rows)
 
     drop_column(rows, "id")
+
+    for column, action in process_columns.items():
+        action(rows, column)
+
     features = drop_column(rows, "feature")
 
     rows = vectorizer.fit_transform(rows)
@@ -100,14 +111,18 @@ def main(data_fname="data/trainingset.txt",
     query_data = pd.read_csv(query_fname, index_col=0, names=names)
     query_rows = to_list(query_data)
     query_ids = drop_column(query_rows, "id")
+
+    for column, action in process_columns.items():
+        action(query_rows, column)
+
     drop_column(query_rows, "feature")
     query_rows = vectorizer.fit_transform(query_rows)
 
     result = classifier.predict(query_rows)
 
     ratio = len([row for row in result if row == "TypeA"]) / len(result)
-    pprint("A/B ratio:", str(ratio))
-    pprint("accuracy:", accuracy)
+    print("A/B ratio:", ratio)
+    print("accuracy:", accuracy)
 
 if __name__ == "__main__":
     main()
