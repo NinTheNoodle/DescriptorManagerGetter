@@ -5,7 +5,7 @@ Authors:
 """
 from pprint import pprint
 from math import log2
-from random import shuffle
+from random import seed, shuffle
 import numpy as np
 import pandas as pd
 from sklearn.tree import DecisionTreeClassifier, export_graphviz
@@ -66,6 +66,7 @@ def drop_column(rows, column_name):
 
 def main(data_fname="data/trainingset.txt",
          query_fname="data/queries.txt",
+         result_fname="solutions/C12722625+C12428088.txt",
          names=names):
     # import pdb; pdb.set_trace()
 
@@ -74,11 +75,10 @@ def main(data_fname="data/trainingset.txt",
     # extract data
     data = pd.read_csv(data_fname, index_col=0, names=names)
     rows = to_list(data)
+    seed(91239123912)
     shuffle(rows)
-
     drop_column(rows, "id")
     features = drop_column(rows, "feature")
-
     rows = vectorizer.fit_transform(rows)
 
     # split into training and validation sets
@@ -103,11 +103,16 @@ def main(data_fname="data/trainingset.txt",
     drop_column(query_rows, "feature")
     query_rows = vectorizer.fit_transform(query_rows)
 
+    # make target estimates
     result = classifier.predict(query_rows)
+    result_data = pd.DataFrame(list(zip(query_ids, result)))
+    result_data.to_csv(result_fname, header=False, index=False,
+                       float_format="%.4f")
 
     ratio = len([row for row in result if row == "TypeA"]) / len(result)
-    pprint("A/B ratio:", str(ratio))
-    pprint("accuracy:", accuracy)
+    print("A/B ratio:", str(ratio))
+    print("accuracy:", str(accuracy))
+
 
 if __name__ == "__main__":
     main()
