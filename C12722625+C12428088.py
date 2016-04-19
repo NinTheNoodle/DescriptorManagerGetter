@@ -34,12 +34,6 @@ names = [
 ]
 
 
-def get_column_processes():
-    return {
-        "duration": drop_column
-    }
-
-
 def to_list(dataframe):
     """
     Converts dataframe to a list of dictionaries, and adds the "id" column
@@ -56,73 +50,63 @@ def to_list(dataframe):
     return rows
 
 
-def drop_column(rows, column_name):
-    """
-    Extracts the values from a particular column and removes it from rows
-
-    The type of rows is expected to be a list of dictionaries
-    """
-    values = []
+def drop_column(rows, name):
     for row in rows:
-        values.append(row[column_name])
-        del row[column_name]
-
-    return values
+        del row[name]
 
 
-def main(data_fname="data/trainingset.txt",
-         query_fname="data/queries.txt",
-         result_fname="solutions/C12722625+C12428088.txt",
-         names=names):
-    # import pdb; pdb.set_trace()
-    process_columns = get_column_processes()
+def get_column(rows, name):
+    return [row[name] for row in rows]
 
-    vectorizer = DictVectorizer(sparse=False)
 
-    # extract data
-    data = pd.read_csv(data_fname, index_col=0, names=names)
-    rows = to_list(data)
-    seed(91239123912)
-    shuffle(rows)
+def proces_columns(rows):
     drop_column(rows, "id")
+    drop_column(rows, "feature")
+    drop_column(rows, "duration")
 
-    for column, action in process_columns.items():
-        action(rows, column)
 
-    features = drop_column(rows, "feature")
-    rows = vectorizer.fit_transform(rows)
+def split(data):
+    midway = len(data) // 2
+    return data[:midway], data[midway:]
 
-    # split into training and validation sets
-    midway = len(rows) // 2
-    training_rows = rows[:midway]
-    training_features = features[:midway]
-    validation_rows = rows[midway:]
-    validation_features = features[midway:]
 
-    # generate random forest for data classification
+def load_data(fname, names):
+    data = pd.read_csv(fname, index_col=0, names=names)
+    return to_list(data)
+
+
+def main():
+    onehot_encoder = DictVectorizer(sparse=False)
     classifier = RandomForestClassifier(
         criterion="entropy"
     )
+
+    training_rows = load_data("data/trainingset.txt", names)
+    query_rows = load_data("data/queries.txt", names)
+
+    seed(123)
+    shuffle(training_rows)
+
+    training_features = get_column(training_rows, "feature")
+    query_ids = get_column(query_rows, "id")
+
+    proces_columns(training_rows)
+    proces_columns(query_rows)
+
+    training_rows = onehot_encoder.fit_transform(training_rows)
+    query_rows = onehot_encoder.fit_transform(query_rows)
+
+    training_rows, validation_rows = split(training_rows)
+    training_features, validation_features = split(training_features)
+
     classifier.fit(training_rows, training_features)
-
     accuracy = classifier.score(validation_rows, validation_features)
-
-    # extract queries
-    query_data = pd.read_csv(query_fname, index_col=0, names=names)
-    query_rows = to_list(query_data)
-    query_ids = drop_column(query_rows, "id")
-
-    for column, action in process_columns.items():
-        action(query_rows, column)
-
-    drop_column(query_rows, "feature")
-    query_rows = vectorizer.fit_transform(query_rows)
 
     # make target estimates
     result = classifier.predict(query_rows)
     result_data = pd.DataFrame(list(zip(query_ids, result)))
-    result_data.to_csv(result_fname, header=False, index=False,
-                       float_format="%.4f")
+    result_data.to_csv("solutions/C12722625+C12428088.txt", header=False,
+                       index=False, float_format="%.4f")
 
     ratio = len([row for row in result if row == "TypeA"]) / len(result)
 
