@@ -17,6 +17,9 @@ from sklearn.feature_extraction import DictVectorizer
 # Splits dataset, performing validation and computing an accuracy score
 compute_accuracy = False
 
+# random seed to use
+random_seed = 123
+
 # Descriptive feature names
 names = [
     "id",
@@ -40,9 +43,14 @@ names = [
 ]
 
 
-def split(data, frac=1/2):
-    pivot = int(len(data) * frac)
-    return data[:pivot], data[pivot:]
+def split(rows, frac=0.5):
+    """
+    Splits a given dataset into two
+
+    frac: what fraction of the data should be in the first slice
+    """
+    pivot = int(len(rows) * frac)
+    return rows[:pivot], rows[pivot:]
 
 
 def to_list(dataframe):
@@ -62,6 +70,9 @@ def to_list(dataframe):
 
 
 def load_data(fname, names):
+    """
+    Loads data from CSV file, returns it as a list of dictionaries
+    """
     data = pd.read_csv(fname, index_col=0, names=names)
     return to_list(data)
 
@@ -78,33 +89,33 @@ def process_columns(rows):
         # introducing a meaningful correlation from otherwise junk data
         row["contacted"] = (row["pdays"] == -1)
 
-        # "-1" values would likely skew the results
+        # "-1" values would skew the results
         del row["pdays"]
 
         # all zero
         del row["duration"]
 
-        # not really numeric (does not make sense to take )
+        # not really numeric (does not make sense to take the mean)
         del row["day"]
 
 
 def main():
     onehot_encoder = DictVectorizer(sparse=False)
     classifier = RandomForestClassifier(
-        random_state=123,
+        random_state=random_seed,
         n_estimators=100,
-        criterion="entropy"
+        criterion="gini",
+        n_jobs=8
     )
 
     training_rows = load_data("data/trainingset.txt", names)
     query_rows = load_data("data/queries.txt", names)
 
-    if compute_accuracy:
-        seed(123)
-        shuffle(training_rows)
+    seed(random_seed)
+    shuffle(training_rows)
 
     training_features = [row["feature"] for row in training_rows]
-    query_ids = [row["id"] for row in training_rows]
+    query_ids = [row["id"] for row in query_rows]
 
     process_columns(training_rows)
     process_columns(query_rows)
@@ -120,17 +131,21 @@ def main():
     classifier.fit(training_rows, training_features)
 
     # make target estimates
-    result = classifier.predict(query_rows)
-    result_data = pd.DataFrame(list(zip(query_ids, result)))
-    result_data.to_csv("solutions/C12722625+C12428088.txt", header=False,
-                       index=False, float_format="%.4f")
+    results = classifier.predict(query_rows)
+    with open("solutions/C12722625+C12428088.txt", "w") as output:
+        for query_id, result in zip(query_ids, results):
+            output.write("{id},{result}\n".format(id=query_id, result=result))
 
     if compute_accuracy:
         accuracy = classifier.score(validation_rows, validation_features)
         print("accuracy:", accuracy)
 
-        ratio = len([row for row in result if row == "TypeA"]) / len(result)
-        print("A/B ratio:", ratio)
+        ratio = (len([row for row in training_features
+                      if row == "TypeA"]) / len(training_features))
+        print("Input A/B ratio:", ratio)
+
+        ratio = len([row for row in results if row == "TypeA"]) / len(results)
+        print("Result A/B ratio:", ratio)
 
 
 if __name__ == "__main__":
